@@ -13,7 +13,7 @@ A powerful cache file detection and deletion tool written in Rust.
 - **Category Classification**: Groups cache files into 7 categories for better organization
 - **Colorful Output**: Uses ANSI colors for better readability
 - **Progress Bar**: Shows real-time scanning progress
-- **Interactive Deletion**: Confirms before deleting files (with a --force option to skip confirmation)
+- **Interactive Deletion**: Confirms before deleting files
 - **Detailed Reports**: Provides summary statistics and detailed file lists
 
 ## Cache Categories
@@ -50,7 +50,7 @@ cargo install --path .
 
 ## Usage
 
-### Detect Cache Files
+### Detect and Manage Cache Files
 
 Scan the current directory for cache files:
 
@@ -64,27 +64,11 @@ Scan a specific directory:
 hica detect /path/to/directory
 ```
 
-### Delete Cache Files
+After scanning, you will be prompted with:
+1. Whether to show the full list of cache files
+2. Whether to delete the detected cache files
 
-Delete cache files in the current directory (with confirmation):
-
-```bash
-hica delete
-```
-
-Delete cache files in a specific directory:
-
-```bash
-hica delete /path/to/directory
-```
-
-Delete cache files without confirmation (force mode):
-
-```bash
-hica delete --force
-# or
-hica delete -f /path/to/directory
-```
+Both prompts default to "No" if you press Enter without typing "y".
 
 ## Contributing
 

@@ -49,14 +49,6 @@ enum Commands {
         /// Path to scan (default: current directory)
         path: Option<PathBuf>,
     },
-    /// Delete cache files
-    Delete {
-        /// Path to scan (default: current directory)
-        path: Option<PathBuf>,
-        /// Skip confirmation
-        #[arg(short, long)]
-        force: bool,
-    },
 }
 
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -281,7 +273,7 @@ async fn scan_cache_files(path: &Path) -> Vec<CacheFile> {
 }
 
 async fn detect_cache_files(path: &Path) {
-    println!("{} Scanning for cache files in {}", "🔍".yellow(), path.display());
+    println!("{} Scanning for cache files in {}", "[Scan:]".yellow(), path.display());
     
     let cache_files = scan_cache_files(path).await;
     let total_size: u64 = cache_files.iter().map(|f| f.size).sum();
@@ -314,75 +306,63 @@ async fn detect_cache_files(path: &Path) {
             );
         }
         
-        // Print detailed file list
-        println!("\n{}", "Cache files: ".blue().bold());
-        for file in cache_files {
-            println!("  {} ({}) [{}]\n    {}", 
-                file.path.file_name().unwrap().to_str().unwrap().yellow(),
-                format_size_with_color(file.size),
-                file.category.as_str().magenta(),
-                file.path.display()
+        // Prompt to show full file list
+        println!("\n{}", "Do you want to see the full list of cache files? (y/N)".yellow());
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).expect("Failed to read input");
+        
+        if input.trim().eq_ignore_ascii_case("y") {
+            println!("\n{}", "Cache files: ".blue().bold());
+            for file in &cache_files {
+                println!("  {} ({}) [{}]\n    {}", 
+                    file.path.file_name().unwrap().to_str().unwrap().yellow(),
+                    format_size_with_color(file.size),
+                    file.category.as_str().magenta(),
+                    file.path.display()
+                );
+            }
+        }
+        
+        // Prompt to delete cache files
+        println!("\n{}", "Do you want to delete these cache files? (y/N)".red().bold());
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).expect("Failed to read input");
+        
+        if input.trim().eq_ignore_ascii_case("y") {
+            let mut deleted_count = 0;
+            let mut deleted_size = 0;
+            
+            println!("\n{} Deleting cache files...", "🗑️".red());
+            
+            for file in cache_files {
+                match fs::remove_file(&file.path).await {
+                    Ok(_) => {
+                        println!("  {} Deleted {}", "[OK!]".green(), file.path.display());
+                        deleted_count += 1;
+                        deleted_size += file.size;
+                    }
+                    Err(e) => {
+                        println!("  {} Failed to delete {}: {}", 
+                            "[Failed!]".red(), 
+                            file.path.display(), 
+                            e.to_string().red()
+                        );
+                    }
+                }
+            }
+            
+            println!("\n{} Deleted {} files totaling {}", 
+                "[OK!]".green(), 
+                deleted_count.to_string().cyan(), 
+                format_size_with_color(deleted_size)
             );
+        } else {
+            println!("\n{} Deletion canceled", "[OK!]".green());
         }
     }
 }
 
-async fn delete_cache_files(path: &Path, force: bool) {
-    println!("{} Scanning for cache files in {}", "[Info:]".yellow(), path.display());
-    
-    let cache_files = scan_cache_files(path).await;
-    let total_size: u64 = cache_files.iter().map(|f| f.size).sum();
-    
-    if cache_files.is_empty() {
-        println!("{} No cache files found", "[OK!]".green());
-        return;
-    }
-    
-    println!("\n{} Found {} cache files totaling {}", 
-        "[Warning!]".yellow(), 
-        cache_files.len().to_string().cyan(), 
-        format_size_with_color(total_size)
-    );
-    
-    if !force {
-        println!("\n{}", "Are you sure you want to delete these files? (y/N)".red().bold());
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input).expect("Failed to read input");
-        
-        if !input.trim().eq_ignore_ascii_case("y") {
-            println!("{} Deletion canceled", "[Failed!]".red());
-            return;
-        }
-    }
-    
-    let mut deleted_count = 0;
-    let mut deleted_size = 0;
-    
-    println!("\n{} Deleting cache files...", "🗑️".red());
-    
-    for file in cache_files {
-        match fs::remove_file(&file.path).await {
-            Ok(_) => {
-                println!("  {} Deleted {}", "[OK!]".green(), file.path.display());
-                deleted_count += 1;
-                deleted_size += file.size;
-            }
-            Err(e) => {
-                println!("  {} Failed to delete {}: {}", 
-                    "[Failed!]".red(), 
-                    file.path.display(), 
-                    e.to_string().red()
-                );
-            }
-        }
-    }
-    
-    println!("\n{} Deleted {} files totaling {}", 
-        "[OK!]".green(), 
-        deleted_count.to_string().cyan(), 
-        format_size_with_color(deleted_size)
-    );
-}
+
 
 #[tokio::main]
 async fn main() {
@@ -392,10 +372,6 @@ async fn main() {
         Commands::Detect { path } => {
             let scan_path = path.unwrap_or_else(|| PathBuf::from("."));
             detect_cache_files(&scan_path).await;
-        }
-        Commands::Delete { path, force } => {
-            let scan_path = path.unwrap_or_else(|| PathBuf::from("."));
-            delete_cache_files(&scan_path, force).await;
         }
     }
 }
